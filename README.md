@@ -1,6 +1,6 @@
 # safecast_deploy
 
-Tooling to deploy Safecast to AWS Elastic Beanstalk and work with AWS.
+Tooling to deploy Safecast to AWS Elastic Beanstalk and work with AWS. Deployments performed using this tool will create a history entry in the [deployment-history Git repository](https://github.com/Safecast/deployment-history/).
 
 ## Installation
 
