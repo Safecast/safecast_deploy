@@ -135,10 +135,6 @@ def run_versions(args):
 
 def main():
     parse_args()
-    # TODO new configuration template is not saved when creating a new
-    # environment, this seems to only be possible from eb cli, not
-    # boto. Note in documentation.
-    #
     # TODO update Grafana panels
     #
     # TODO method to switch to maintenance page

@@ -19,10 +19,6 @@ class State:
             'web': env,
             'wrk': '{}-wrk'.format(env),
         }
-        self.templates = {
-            'web': env,
-            'wrk': '{}_wrk'.format(env),
-        }
 
         self.eb_client = boto3.client('elasticbeanstalk')
         self._c = self.eb_client

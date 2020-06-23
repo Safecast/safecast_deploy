@@ -24,7 +24,7 @@ class NewEnv:
     def _handle_worker(self):
         # First, turn off the current worker to avoid any concurrency issues
         print("Setting the worker tier to scale to 0.", file=sys.stderr)
-        ebclient.update_environment(ApplicationName=self.state.app,
+        self._c.update_environment(ApplicationName=self.state.app,
                                     EnvironmentName=self.state.env_metadata[self.state.subenvs['wrk']]['name'],
                                     OptionSettings=[
                                         {
@@ -42,35 +42,35 @@ class NewEnv:
                                     ])
         verbose_sleep(480)
         print("Creating the new worker environment.", file=sys.stderr)
-        ebclient.create_environment(
+        self._c.create_environment(
             ApplicationName=self.state.app,
             EnvironmentName=self.new_env_metadata['wrk']['name'],
             PlatformArn=self.state.new_arn,
-            TemplateName=self.state.templates['wrk'],
+            TemplateName=self.state.subenvs['wrk'],
             VersionLabel=self.state.new_version,
         )
         self._wait_for_green(self.new_env_metadata['wrk']['name'])
         print("Terminating the old worker environment.", file=sys.stderr)
-        ebclient.terminate_environment(EnvironmentName=self.state.env_metadata[self.state.subenvs['wrk']]['name'])
+        self._c.terminate_environment(EnvironmentName=self.state.env_metadata[self.state.subenvs['wrk']]['name'])
 
-    def _handle_web():
+    def _handle_web(self):
         print("Creating the new Web environment.", file=sys.stderr)
-        ebclient.create_environment(
+        self._c.create_environment(
             ApplicationName=self.state.app,
             EnvironmentName=self.new_env_metadata['web']['name'],
             PlatformArn=self.state.new_arn,
-            TemplateName=self.state.templates['web'],
+            TemplateName=self.state.subenvs['web'],
             VersionLabel=self.state.new_version,
         )
         self._wait_for_green(self.new_env_metadata['web']['name'])
         print("Swapping web environment CNAMEs.", file=sys.stderr)
-        ebclient.swap_environment_cnames(
+        self._c.swap_environment_cnames(
             SourceEnvironmentName=self.state.env_metadata[self.state.subenvs['web']]['name'],
             DestinationEnvironmentName=self.new_env_metadata['web']['name'],
         )
         verbose_sleep(120)
         print("Terminating the old web environment.", file=sys.stderr)
-        ebclient.terminate_environment(EnvironmentName=self.state.env_metadata[self.state.subenvs['web']]['name'])
+        self._c.terminate_environment(EnvironmentName=self.state.env_metadata[self.state.subenvs['web']]['name'])
 
     def _generate_result(self):
         completed_time = datetime.datetime.now(datetime.timezone.utc)
@@ -120,7 +120,7 @@ class NewEnv:
         print("Deployment completed.", file=sys.stderr)
 
     def _calculate_new_envs(self):
-        new_num = _balance_env_num()
+        new_num = self._balance_env_num()
         self.new_env_metadata = {
             'web': {
                 'name': 'safecast{app}-{env}-{num:03}'.format(
@@ -146,7 +146,7 @@ class NewEnv:
     def _wait_for_green(self, env_name):
         verbose_sleep(70)
         wait_seconds = 0
-        while wait_seconds < 480:
+        while wait_seconds < 540:
             health = self._c.describe_environment_health(
                 EnvironmentName=env_name,
                 AttributeNames=['HealthStatus', ]
@@ -156,6 +156,6 @@ class NewEnv:
                 return
             verbose_sleep(40)
             wait_seconds += 40
-        print("Environment health did not return to normal within 480 seconds. Aborting further operations.",
+        print("Environment health did not return to normal within 540 seconds. Aborting further operations.",
               file=sys.stderr)
         exit(1)
