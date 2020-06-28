@@ -24,22 +24,23 @@ class NewEnv:
     def _handle_worker(self):
         # First, turn off the current worker to avoid any concurrency issues
         print("Setting the worker tier to scale to 0.", file=sys.stderr)
-        self._c.update_environment(ApplicationName=self.state.app,
-                                    EnvironmentName=self.state.env_metadata[self.state.subenvs['wrk']]['name'],
-                                    OptionSettings=[
-                                        {
-                                            'ResourceName': 'AWSEBAutoScalingGroup',
-                                            'Namespace': 'aws:autoscaling:asg',
-                                            'OptionName': 'MaxSize',
-                                            'Value': '0',
-                                        },
-                                        {
-                                            'ResourceName': 'AWSEBAutoScalingGroup',
-                                            'Namespace': 'aws:autoscaling:asg',
-                                            'OptionName': 'MinSize',
-                                            'Value': '0'
-                                        },
-                                    ])
+        self._c.update_environment(
+            ApplicationName=self.state.app,
+            EnvironmentName=self.state.env_metadata[self.state.subenvs['wrk']]['name'],
+            OptionSettings=[
+                {
+                    'ResourceName': 'AWSEBAutoScalingGroup',
+                    'Namespace': 'aws:autoscaling:asg',
+                    'OptionName': 'MaxSize',
+                    'Value': '0',
+                },
+                {
+                    'ResourceName': 'AWSEBAutoScalingGroup',
+                    'Namespace': 'aws:autoscaling:asg',
+                    'OptionName': 'MinSize',
+                    'Value': '0'
+                },
+            ])
         verbose_sleep(480)
         print("Creating the new worker environment.", file=sys.stderr)
         self._c.create_environment(

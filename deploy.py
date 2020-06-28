@@ -13,6 +13,7 @@ import boto3
 import pprint
 import re
 import safecast_deploy
+import safecast_deploy.config_saver
 import safecast_deploy.new_env
 import safecast_deploy.same_env
 import safecast_deploy.ssh
@@ -54,6 +55,19 @@ def parse_args():
                             help="The target environment to deploy to.",)
     same_env_p.add_argument('version', help="The new version to deploy.")
     same_env_p.set_defaults(func=run_same_env)
+
+    save_configs_p = ps.add_parser('save_configs',
+                                   help="Overwrite the saved configuration templates from the current environments.")
+    save_configs_p.add_argument('-a', '--app',
+                                choices=['api', 'ingest'],
+                                help="Limit the overwrite to a specific application.")
+    save_configs_p.add_argument('-e', '--env',
+                                choices=['dev', 'prd'],
+                                help="Limit the overwrite to a specific environment.")
+    save_configs_p.add_argument('-r', '--role',
+                                choices=['web', 'wrk'],
+                                help="Limit the overwrite to a specific role.")
+    save_configs_p.set_defaults(func=safecast_deploy.config_saver.run_cli)
 
     ssh_p = ps.add_parser('ssh', help='SSH to the selected environment.')
     ssh_p.add_argument('app',
@@ -109,17 +123,21 @@ def run_desc_template(args):
 
 
 def run_new_env(args):
-    state = safecast_deploy.state.State(args.app,
-                                  args.env,
-                                  new_version=args.version,
-                                  new_arn=args.arn)
+    state = safecast_deploy.state.State(
+        args.app,
+        args.env,
+        new_version=args.version,
+        new_arn=args.arn
+    )
     safecast_deploy.new_env.NewEnv(state).run()
 
 
 def run_same_env(args):
-    state = safecast_deploy.state.State(args.app,
-                                  args.env,
-                                  new_version=args.version,)
+    state = safecast_deploy.state.State(
+        args.app,
+        args.env,
+        new_version=args.version,
+    )
     safecast_deploy.same_env.SameEnv(state).run()
 
 
@@ -135,6 +153,12 @@ def run_versions(args):
 
 def main():
     parse_args()
+    # TODO update environment configs from currently running
+    # environments first, we've lost too many live configs by
+    # forgetting to save back. Also turn on advanced health monitoring
+    # in all ingest/api environments, try to see how it can be
+    # preserved (probably in config?)
+    #
     # TODO update Grafana panels
     #
     # TODO method to switch to maintenance page

@@ -58,17 +58,17 @@ class SameEnv:
         self._add_git('wrk', result)
         return result
 
-    def _add_git(self, tier, result):
+    def _add_git(self, role, result):
         repo_names = {
             'api': 'safecastapi',
             'ingest': 'ingest',
         }
-        if 'git_commit' in self.state.old_versions_parsed[tier] \
-           and 'git_commit' in self.state.new_versions_parsed[tier]:
-            result[tier]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}..{}'.format(
+        if 'git_commit' in self.state.old_versions_parsed[role] \
+           and 'git_commit' in self.state.new_versions_parsed[role]:
+            result[role]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}..{}'.format(
                 repo_names[self.state.app],
-                self.state.old_versions_parsed[tier]['git_commit'],
-                self.state.new_versions_parsed[tier]['git_commit']
+                self.state.old_versions_parsed[role]['git_commit'],
+                self.state.new_versions_parsed[role]['git_commit']
             )
 
     def _print_result(self, result):
