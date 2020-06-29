@@ -35,7 +35,7 @@ class GrafanaUpdater:
             dashboard,
             'AutoScalingGroupName',
             env_resources['AutoScalingGroups'][0]['Name'],
-            parent_title_pattern=re.compile(r'(web CPU|web network)')
+            parent_title_pattern=re.compile(r'.*(web CPU|web network)')
         )
 
         metadata = self.state.env_metadata['prd-wrk']
