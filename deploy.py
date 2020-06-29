@@ -53,7 +53,8 @@ def parse_args():
     new_env_p.add_argument('arn', help="The ARN the new deployment should use.")
     new_env_p.add_argument(
         '--no-update-templates', action='store_true',
-        help="If this flag is set, the script will not update the Elastic Beanstalk environment templates from the currently running environments before beginning the deployment.",)
+        help="If this flag is set, the script will not update the Elastic Beanstalk environment templates "
+        + "from the currently running environments before beginning the deployment.",)
     new_env_p.set_defaults(func=run_new_env)
 
     same_env_p = ps.add_parser('same_env', help='Deploy a new version of the app to the existing environment.')
@@ -94,9 +95,10 @@ def parse_args():
     ssh_p.set_defaults(func=run_ssh)
 
     update_grafana_p = ps.add_parser('update_grafana', help='Update the Grafana dashboard for the given application to match the running environment.')
-    update_grafana_p.add_argument('app',
-                            choices=['api', 'ingest', ],
-                            help="The target application.",)
+    update_grafana_p.add_argument(
+        'app',
+        choices=['api', 'ingest', ],
+        help="The target application.",)
     update_grafana_p.set_defaults(func=safecast_deploy.grafana_updater.run_cli)
 
     versions_p = ps.add_parser('versions', help='List the deployable versions for this environment, sorted by age.')
@@ -128,9 +130,11 @@ def run_list_arns(args):
     platform_arns = sorted([m['PlatformArn'] for m in platforms])
     print(*platform_arns, sep='\n')
 
+
 def run_desc_metadata(args):
     state = safecast_deploy.state.State(args.app)
     pprint.PrettyPrinter(stream=sys.stderr).pprint(state.env_metadata)
+
 
 def run_desc_template(args):
     c = boto3.client('elasticbeanstalk')
@@ -172,8 +176,6 @@ def run_versions(args):
 
 def main():
     parse_args()
-    # TODO update Grafana panels
-    #
     # TODO method to switch to maintenance page
     #
     # TODO method to clean out old versions
