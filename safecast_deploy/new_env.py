@@ -2,16 +2,21 @@ import datetime
 import pprint
 import sys
 
-from safecast_deploy import git_logger, verbose_sleep
+from safecast_deploy import config_saver, git_logger, verbose_sleep
 
 
 class NewEnv:
-    def __init__(self, state):
+    def __init__(self, state, update_templates):
         self.state = state
         self._c = state.eb_client
+        self.update_templates = update_templates
 
     def run(self):
         self.start_time = datetime.datetime.now(datetime.timezone.utc)
+        if self.update_templates:
+            config_saver.ConfigSaver(
+                app=self.state.app, env=self.state.env
+            ).run()
         # Handle the worker environment first, to ensure that database
         # migrations are applied
         self._calculate_new_envs()

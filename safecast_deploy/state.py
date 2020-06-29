@@ -86,6 +86,7 @@ class State:
                 exit(1)
             self.env_metadata[match.group('env')] = {
                 'api_env': api_env,
+                'api_resources': self._c.describe_environment_resources(EnvironmentName=api_env['EnvironmentName'])['EnvironmentResources'],
                 'name': api_env['EnvironmentName'],
                 'num': int(match.group('num')),
                 'version': api_env['VersionLabel'],

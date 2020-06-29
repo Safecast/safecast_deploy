@@ -14,6 +14,7 @@ import pprint
 import re
 import safecast_deploy
 import safecast_deploy.config_saver
+import safecast_deploy.grafana_updater
 import safecast_deploy.new_env
 import safecast_deploy.same_env
 import safecast_deploy.ssh
@@ -27,6 +28,12 @@ def parse_args():
 
     list_arns_p = ps.add_parser('list_arns', help="List all currently recommended Ruby ARNS.")
     list_arns_p.set_defaults(func=run_list_arns)
+
+    desc_metadata_p = ps.add_parser('desc_metadata', help="")
+    desc_metadata_p.add_argument('app',
+                                 choices=['api', 'ingest'],
+                                 help="The application to describe.",)
+    desc_metadata_p.set_defaults(func=run_desc_metadata)
 
     desc_template_p = ps.add_parser('desc_template', help="Show a saved template's configuration.")
     desc_template_p.add_argument('app',
@@ -44,6 +51,9 @@ def parse_args():
                            help="The target environment to deploy to.",)
     new_env_p.add_argument('version', help="The new version to deploy.")
     new_env_p.add_argument('arn', help="The ARN the new deployment should use.")
+    new_env_p.add_argument(
+        '--no-update-templates', action='store_true',
+        help="If this flag is set, the script will not update the Elastic Beanstalk environment templates from the currently running environments before beginning the deployment.",)
     new_env_p.set_defaults(func=run_new_env)
 
     same_env_p = ps.add_parser('same_env', help='Deploy a new version of the app to the existing environment.')
@@ -83,6 +93,12 @@ def parse_args():
                        help="Select the specific server from a list. Otherwise, will connect to the first server found.",)
     ssh_p.set_defaults(func=run_ssh)
 
+    update_grafana_p = ps.add_parser('update_grafana', help='Update the Grafana dashboard for the given application to match the running environment.')
+    update_grafana_p.add_argument('app',
+                            choices=['api', 'ingest', ],
+                            help="The target application.",)
+    update_grafana_p.set_defaults(func=safecast_deploy.grafana_updater.run_cli)
+
     versions_p = ps.add_parser('versions', help='List the deployable versions for this environment, sorted by age.')
     versions_p.add_argument('app',
                             choices=['api', 'ingest', ],
@@ -112,6 +128,9 @@ def run_list_arns(args):
     platform_arns = sorted([m['PlatformArn'] for m in platforms])
     print(*platform_arns, sep='\n')
 
+def run_desc_metadata(args):
+    state = safecast_deploy.state.State(args.app)
+    pprint.PrettyPrinter(stream=sys.stderr).pprint(state.env_metadata)
 
 def run_desc_template(args):
     c = boto3.client('elasticbeanstalk')
@@ -129,7 +148,7 @@ def run_new_env(args):
         new_version=args.version,
         new_arn=args.arn
     )
-    safecast_deploy.new_env.NewEnv(state).run()
+    safecast_deploy.new_env.NewEnv(state, not args.no_update_templates).run()
 
 
 def run_same_env(args):
@@ -153,12 +172,6 @@ def run_versions(args):
 
 def main():
     parse_args()
-    # TODO update environment configs from currently running
-    # environments first, we've lost too many live configs by
-    # forgetting to save back. Also turn on advanced health monitoring
-    # in all ingest/api environments, try to see how it can be
-    # preserved (probably in config?)
-    #
     # TODO update Grafana panels
     #
     # TODO method to switch to maintenance page

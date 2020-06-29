@@ -16,6 +16,7 @@ pip -r requirements.txt
 * All operations require AWS credentials for our organzization to be available. The easiest way to accomplish this is to configure a profile in your `~/.aws/credentials` file and point to it using an export, e.g. `export AWS_PROFILE=safecast`.
 * In order to deploy a new application version, you must be able to commit to the [deployment-history Git repository](https://github.com/Safecast/deployment-history/).
 * In order to ssh to an instance, you must have the Safecast SSH key.
+* In order to update Grafana dashboards, you must generate and use a Grafana API key. You will be interactively prompted to enter the key when running the `update_grafana` command.
 
 ## Usage
 
