@@ -65,7 +65,7 @@ class SameEnv:
         }
         if 'git_commit' in self.state.old_versions_parsed[role] \
            and 'git_commit' in self.state.new_versions_parsed[role]:
-            result[role]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}..{}'.format(
+            result[role]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}...{}'.format(
                 repo_names[self.state.app],
                 self.state.old_versions_parsed[role]['git_commit'],
                 self.state.new_versions_parsed[role]['git_commit']
