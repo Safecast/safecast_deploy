@@ -1,12 +1,12 @@
-import datetime
 import getpass
 import json
 import os
 import re
-import sys
 import urllib
 
-from safecast_deploy import git_logger, state, verbose_sleep
+import sys
+
+from safecast_deploy import state
 
 
 def run_cli(args):
