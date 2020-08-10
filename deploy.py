@@ -108,7 +108,11 @@ def parse_args():
     versions_p.set_defaults(func=run_versions)
 
     args = p.parse_args()
-    args.func(args)
+    if 'func' in args:
+        args.func(args)
+    else:
+        p.error("too few arguments")
+
 
 
 def run_list_arns(args):
