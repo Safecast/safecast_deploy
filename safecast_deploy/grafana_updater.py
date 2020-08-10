@@ -1,7 +1,7 @@
 import datetime
 import getpass
 import json
-import pprint
+import os
 import re
 import sys
 import urllib
@@ -10,7 +10,10 @@ from safecast_deploy import git_logger, state, verbose_sleep
 
 
 def run_cli(args):
-    grafana_api_key = getpass.getpass('Enter the Grafana API key (will not be echoed): ')
+    if 'GRAFANA_API_KEY' in os.environ:
+        grafana_api_key = os.environ['GRAFANA_API_KEY']
+    else:
+        grafana_api_key = getpass.getpass('Enter the Grafana API key (will not be echoed): ')
     GrafanaUpdater(args.app, grafana_api_key).run()
 
 
