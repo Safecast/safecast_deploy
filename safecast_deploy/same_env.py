@@ -21,9 +21,10 @@ class SameEnv:
         git_logger.log_result(result)
 
     def _handle_worker(self):
-        print("Deploying to the worker.", file=sys.stderr)
-        env_name = self.state.env_metadata[self.state.subenvs['wrk']]['name']
-        self._update_environment(env_name)
+        if self.state.has_worker:
+            print("Deploying to the worker.", file=sys.stderr)
+            env_name = self.state.env_metadata[self.state.subenvs['wrk']]['name']
+            self._update_environment(env_name)
 
     def _handle_web(self):
         print("Deploying to the web instances.", file=sys.stderr)
@@ -46,22 +47,26 @@ class SameEnv:
                 'old_version': self.state.env_metadata[self.state.subenvs['web']]['version'],
                 'old_version_parsed': self.state.old_versions_parsed['web'],
             },
-            'wrk': {
+        }
+        self._add_git('web', result)
+
+        if self.state.has_worker:
+            result['wrk'] = {
                 'env': self.state.env_metadata[self.state.subenvs['wrk']]['name'],
                 'new_version': self.state.new_version,
                 'new_version_parsed': self.state.new_versions_parsed['wrk'],
                 'old_version': self.state.env_metadata[self.state.subenvs['wrk']]['version'],
                 'old_version_parsed': self.state.old_versions_parsed['wrk'],
-            },
-        }
-        self._add_git('web', result)
-        self._add_git('wrk', result)
+            }
+            self._add_git('wrk', result)
+
         return result
 
     def _add_git(self, role, result):
         repo_names = {
             'api': 'safecastapi',
             'ingest': 'ingest',
+            'reporting': 'reporting2',
         }
         if 'git_commit' in self.state.old_versions_parsed[role] \
            and 'git_commit' in self.state.new_versions_parsed[role]:

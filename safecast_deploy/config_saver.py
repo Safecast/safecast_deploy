@@ -18,6 +18,7 @@ class ConfigSaver:
         if app is None:
             self.states['api'] = state.State('api')
             self.states['ingest'] = state.State('ingest')
+            self.states['reporting'] = state.State('reporting')
             self._c = self.states['api'].eb_client
         else:
             self.states[app] = state.State(app)
@@ -49,7 +50,8 @@ class ConfigSaver:
         }
         if self.role is None:
             self.process_role(app, env, 'web', template_names)
-            self.process_role(app, env, 'wrk', template_names)
+            if self.states[app].has_worker:
+                self.process_role(app, env, 'wrk', template_names)
         else:
             self.process_role(app, env, self.role, template_names)
 

@@ -29,22 +29,25 @@ def parse_args():
     list_arns_p = ps.add_parser('list_arns', help="List all currently recommended Ruby ARNS.")
     list_arns_p.set_defaults(func=run_list_arns)
 
+    apps = ['api', 'ingest', 'reporting']
+    environments = ['dev', 'prd']
+
     desc_metadata_p = ps.add_parser('desc_metadata', help="")
     desc_metadata_p.add_argument('app',
-                                 choices=['api', 'ingest'],
+                                 choices=apps,
                                  help="The application to describe.",)
     desc_metadata_p.set_defaults(func=run_desc_metadata)
 
     desc_template_p = ps.add_parser('desc_template', help="Show a saved template's configuration.")
     desc_template_p.add_argument('app',
-                                 choices=['api', 'ingest'],
+                                 choices=apps,
                                  help="The application this template belongs to.",)
     desc_template_p.add_argument('template', help="The template's name.",)
     desc_template_p.set_defaults(func=run_desc_template)
 
     new_env_p = ps.add_parser('new_env', help="Create and switch to a completely new environment.")
     new_env_p.add_argument('app',
-                           choices=['api', 'ingest'],
+                           choices=apps,
                            help="The target application to deploy to.",)
     new_env_p.add_argument('env',
                            choices=['dev', 'prd'],
@@ -59,10 +62,10 @@ def parse_args():
 
     same_env_p = ps.add_parser('same_env', help='Deploy a new version of the app to the existing environment.')
     same_env_p.add_argument('app',
-                            choices=['api', 'ingest'],
+                            choices=apps,
                             help="The target application to deploy to.",)
     same_env_p.add_argument('env',
-                            choices=['dev', 'prd'],
+                            choices=environments,
                             help="The target environment to deploy to.",)
     same_env_p.add_argument('version', help="The new version to deploy.")
     same_env_p.set_defaults(func=run_same_env)
@@ -70,10 +73,10 @@ def parse_args():
     save_configs_p = ps.add_parser('save_configs',
                                    help="Overwrite the saved configuration templates from the current environments.")
     save_configs_p.add_argument('-a', '--app',
-                                choices=['api', 'ingest'],
+                                choices=apps,
                                 help="Limit the overwrite to a specific application.")
     save_configs_p.add_argument('-e', '--env',
-                                choices=['dev', 'prd'],
+                                choices=environments,
                                 help="Limit the overwrite to a specific environment.")
     save_configs_p.add_argument('-r', '--role',
                                 choices=['web', 'wrk'],
@@ -82,7 +85,7 @@ def parse_args():
 
     ssh_p = ps.add_parser('ssh', help='SSH to the selected environment.')
     ssh_p.add_argument('app',
-                       choices=['api', 'ingest', ],
+                       choices=apps,
                        help="The target application.",)
     ssh_p.add_argument('env',
                        choices=['dev', 'prd', ],
@@ -91,19 +94,19 @@ def parse_args():
                        choices=['web', 'wrk', ],
                        help="The type of server.",)
     ssh_p.add_argument('-s', '--select', action='store_true',
-                       help="Select the specific server from a list. Otherwise, will connect to the first server found.",)
+                       help="Choose a specific server. Otherwise, will connect to the first server found.",)
     ssh_p.set_defaults(func=run_ssh)
 
     update_grafana_p = ps.add_parser('update_grafana', help='Update the Grafana dashboard for the given application to match the running environment.')
     update_grafana_p.add_argument(
         'app',
-        choices=['api', 'ingest', ],
+        choices=apps,
         help="The target application.",)
     update_grafana_p.set_defaults(func=safecast_deploy.grafana_updater.run_cli)
 
     versions_p = ps.add_parser('versions', help='List the deployable versions for this environment, sorted by age.')
     versions_p.add_argument('app',
-                            choices=['api', 'ingest', ],
+                            choices=apps,
                             help="The target application.",)
     versions_p.set_defaults(func=run_versions)
 

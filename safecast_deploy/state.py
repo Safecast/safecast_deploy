@@ -36,19 +36,20 @@ class State:
             print("ERROR: New version was not found at AWS.", file=sys.stderr)
             exit(1)
         self.old_versions_parsed = {
-            'web': self._parse_version(self.env_metadata[self.subenvs['web']]['version']),
-            'wrk': self._parse_version(self.env_metadata[self.subenvs['wrk']]['version']),
+            'web': self._parse_version(self.env_metadata[self.subenvs['web']]['version'])
         }
         self.new_versions_parsed = {
-            'web': self._parse_version(self.new_version),
-            'wrk': self._parse_version(self.new_version),
+            'web': self._parse_version(self.new_version)
         }
+        if self.has_worker:
+            self.old_versions_parsed['wrk'] = self._parse_version(self.env_metadata[self.subenvs['wrk']]['version'])
+            self.new_versions_parsed['wrk'] = self._parse_version(self.new_version)
 
     def _parse_version(self, version_str):
         if version_str is None:
             return
-        git_hash_pattern = re.compile(r'^(?P<app>(api|ingest))-(?P<clean_branch_name>.+)-(?P<build_num>\d+)-(?P<commit>[0-9a-f]{40})$')
-        no_git_hash_pattern = re.compile(r'^(?P<app>(api|ingest))-(?P<clean_branch_name>.+)-(?P<build_num>\d+)$')
+        git_hash_pattern = re.compile(r'^(?P<app>(api|ingest|reporting))-(?P<clean_branch_name>.+)-(?P<build_num>\d+)-(?P<commit>[0-9a-f]{40})$')
+        no_git_hash_pattern = re.compile(r'^(?P<app>(api|ingest|reporting))-(?P<clean_branch_name>.+)-(?P<build_num>\d+)$')
         git_match = git_hash_pattern.match(version_str)
         no_git_match = no_git_hash_pattern.match(version_str)
         if git_match:
@@ -59,6 +60,7 @@ class State:
         elif no_git_match:
             match = no_git_match
             parsed_version = {}
+        # TODO: var is undefined if an `eb deploy` bundle is in use, would be good have a fallback for that case
         parsed_version.update({
             'app': match.group('app'),
             'circleci_build_num': match.group('build_num'),
@@ -91,6 +93,7 @@ class State:
                 'num': int(match.group('num')),
                 'version': api_env['VersionLabel'],
             }
+        self.has_worker = self.subenvs['wrk'] in self.env_metadata
 
     def _classify_available_versions(self):
         self.api_versions = sorted(

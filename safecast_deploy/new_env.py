@@ -20,7 +20,8 @@ class NewEnv:
         # Handle the worker environment first, to ensure that database
         # migrations are applied
         self._calculate_new_envs()
-        self._handle_worker()
+        if self.state.has_worker:
+            self._handle_worker()
         self._handle_web()
         result = self._generate_result()
         self._print_result(result)
@@ -95,23 +96,27 @@ class NewEnv:
                 'old_version': self.state.env_metadata[self.state.subenvs['web']]['version'],
                 'old_version_parsed': self.state.old_versions_parsed['web'],
             },
-            'wrk': {
-                'new_env': self.new_env_metadata['wrk']['name'],
-                'new_version': self.state.new_version,
-                'new_version_parsed': self.state.new_versions_parsed['wrk'],
-                'old_env': self.state.env_metadata[self.state.subenvs['wrk']]['name'],
-                'old_version': self.state.env_metadata[self.state.subenvs['wrk']]['version'],
-                'old_version_parsed': self.state.old_versions_parsed['wrk'],
-            },
+
         }
         self._add_git('web', result)
-        self._add_git('wrk', result)
+
+        if self.state.has_worker:
+            result['wrk'] = {
+                'env': self.state.env_metadata[self.state.subenvs['wrk']]['name'],
+                'new_version': self.state.new_version,
+                'new_version_parsed': self.state.new_versions_parsed['wrk'],
+                'old_version': self.state.env_metadata[self.state.subenvs['wrk']]['version'],
+                'old_version_parsed': self.state.old_versions_parsed['wrk'],
+            }
+            self._add_git('wrk', result)
+
         return result
 
     def _add_git(self, tier, result):
         repo_names = {
             'api': 'safecastapi',
             'ingest': 'ingest',
+            'reporting': 'reporting',
         }
         if 'git_commit' in self.state.old_versions_parsed[tier] \
            and 'git_commit' in self.state.new_versions_parsed[tier]:
@@ -146,8 +151,11 @@ class NewEnv:
 
     def _balance_env_num(self):
         web_num = (self.state.env_metadata[self.state.subenvs['web']]['num'] + 1) % 1000
-        wrk_num = (self.state.env_metadata[self.state.subenvs['wrk']]['num'] + 1) % 1000
-        return max(web_num, wrk_num)
+        if self.state.has_worker:
+            wrk_num = (self.state.env_metadata[self.state.subenvs['wrk']]['num'] + 1) % 1000
+            return max(web_num, wrk_num)
+        else:
+            return web_num
 
     def _wait_for_green(self, env_name):
         verbose_sleep(70)
