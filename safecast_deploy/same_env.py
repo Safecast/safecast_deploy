@@ -66,7 +66,7 @@ class SameEnv:
         repo_names = {
             'api': 'safecastapi',
             'ingest': 'ingest',
-            'reporting': 'reporting2',
+            'reporting': 'reporting',
         }
         if 'git_commit' in self.state.old_versions_parsed[role] \
            and 'git_commit' in self.state.new_versions_parsed[role]:
