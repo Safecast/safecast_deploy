@@ -27,8 +27,16 @@ def log_result(result):
 
 def write_entry(result, temp_dir, repo):
     log_file_path = os.path.join(temp_dir, result['app'], (result['env'] + '.json'))
-    with open(log_file_path, 'r', encoding='utf-8', newline='\n') as f:
-        history = json.load(f)
+
+    if not os.path.exists(os.path.dirname(log_file_path)):
+        os.mkdir(os.path.dirname(log_file_path))
+
+    if os.path.exists(log_file_path):
+        with open(log_file_path, 'r', encoding='utf-8', newline='\n') as f:
+            history = json.load(f)
+    else:
+        history = []
+
     history.insert(0, result)
     with open(log_file_path, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(history, f, indent=2, sort_keys=True, cls=Iso8601DateTimeEncoder)
