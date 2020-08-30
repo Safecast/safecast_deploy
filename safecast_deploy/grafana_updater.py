@@ -5,6 +5,7 @@ import re
 import urllib
 
 import sys
+from urllib.parse import urlparse
 
 from safecast_deploy import state
 
@@ -48,6 +49,14 @@ class GrafanaUpdater:
             'AutoScalingGroupName',
             env_resources['AutoScalingGroups'][0]['Name'],
             parent_title_pattern=re.compile(r'(Worker CPU|Worker Network)')
+        )
+
+        queue_url = [q['URL'] for q in env_resources['Queues'] if q['Name'] == 'WorkerQueue'][0]
+        queue_name = urlparse(queue_url).path.split('/')[-1]
+        self._update_key(
+            dashboard,
+            'QueueName',
+            queue_name
         )
 
         self._push_dashboard(dashboard)
