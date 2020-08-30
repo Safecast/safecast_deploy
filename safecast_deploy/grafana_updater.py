@@ -28,8 +28,6 @@ class GrafanaUpdater:
             self.dashboard_uid = 'MoVFmrdZz'
 
     def run(self):
-        c = self.state.eb_client
-
         dashboard = self._get_dashboard()
 
         metadata = self.state.env_metadata['prd']
