@@ -2,29 +2,38 @@ import boto3
 import re
 import sys
 
+from aws_state import AwsState, AwsTier, ParsedVersion, AwsTierType
+from env_type import EnvType
 
 class State:
     def __init__(
             self,
-            app,
-            env=None,
+            aws_app_name,
+            eb_client,
             new_version=None,
             new_arn=None):
-        self.app = app
-        self.env = env
+        self.aws_app_name = aws_app_name
         self.new_version = new_version
         self.new_arn = new_arn
+        self._c = eb_client
 
         self.subenvs = {
             'web': env,
             'wrk': '{}-wrk'.format(env),
         }
 
-        self.eb_client = boto3.client('elasticbeanstalk')
-        self._c = self.eb_client
         self._identify_current_envs()
         self._classify_available_versions()
         self._validate_version()
+
+    def old_aws_state(self):
+        return AwsState(
+            aws_app_name=self.aws_app_name,
+            envs=self._build_envs(),
+        )
+
+    def new_aws_state(self):
+        return old_aws_state.copy()#necessary changes
 
     def _validate_version(self):
         if self.new_version is None:
@@ -52,33 +61,31 @@ class State:
         no_git_hash_pattern = re.compile(r'^(?P<app>(api|ingest|reporting))-(?P<clean_branch_name>.+)-(?P<build_num>\d+)$')
         git_match = git_hash_pattern.match(version_str)
         no_git_match = no_git_hash_pattern.match(version_str)
+        git_commit = None
         if git_match:
             match = git_match
-            parsed_version = {
-                'git_commit': match.group('commit')
-            }
+            git_commit=match.group('commit')
         elif no_git_match:
             match = no_git_match
-            parsed_version = {}
         # TODO: var is undefined if an `eb deploy` bundle is in use, would be good have a fallback for that case
-        parsed_version.update({
-            'app': match.group('app'),
-            'circleci_build_num': match.group('build_num'),
-            'clean_branch_name': match.group('clean_branch_name'),
-        })
-        return parsed_version
+        return ParsedVersion(
+            app=match.group('app'),
+            circleci_build_num=int(match.group('build_num')),
+            clean_branch_name=match.group('clean_branch_name'),
+            git_commit=git_commit
+        )
 
     def _identify_current_envs(self):
         api_envs = self._c.describe_environments(
-            ApplicationName=self.app, IncludeDeleted=False)['Environments']
-        name_pattern = re.compile('safecast' + self.app + r'-(?P<env>(dev|dev-wrk|prd|prd-wrk))-(?P<num>\d{3})')
+            ApplicationName=self.aws_app_name, IncludeDeleted=False)['Environments']
+        name_pattern = re.compile('safecast' + self.aws_app_name + r'-(?P<env>(dev|dev-wrk|prd|prd-wrk))-(?P<num>\d{3})')
         self.env_metadata = {}
         for api_env in api_envs:
             match = name_pattern.fullmatch(api_env['EnvironmentName'])
             if match is None:
-                print('WARN: unrecognized environment ' + api_env['EnvironmentName'], file=sys.stderr)
+                print(f"WARN: unrecognized environment {api_env['EnvironmentName']}, not processing", file=sys.stderr)
                 continue
-            env = match.group('env')
+            env_type = EnvType.fromString(match.group('env'))
             if env in self.env_metadata:
                 print("More than one "
                       + env

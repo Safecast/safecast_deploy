@@ -4,8 +4,8 @@
 # environment, not for redeploying to an existing environment.
 
 import sys
-if sys.version_info.major < 3 or sys.version_info.minor < 7:
-    print("Error: This script requires at least Python 3.7.", file=sys.stderr)
+if sys.version_info.major < 3 or sys.version_info.minor < 8:
+    print("Error: This script requires at least Python 3.8.", file=sys.stderr)
     exit(1)
 
 import argparse
@@ -117,7 +117,6 @@ def parse_args():
         p.error("too few arguments")
 
 
-
 def run_list_arns(args):
     c = boto3.client('elasticbeanstalk')
     platforms = c.list_platform_versions(
@@ -166,6 +165,7 @@ def run_same_env(args):
     state = safecast_deploy.state.State(
         args.app,
         args.env,
+        boto3.client('elasticbeanstalk'),
         new_version=args.version,
     )
     safecast_deploy.same_env.SameEnv(state).run()
