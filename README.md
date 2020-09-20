@@ -8,7 +8,7 @@ It's best if this is run in its own virtualenv. It seems that `wheel` must be in
 
 ```
 pip install wheel
-pip -r requirements.txt
+pip install --requirement requirements.txt
 ```
 
 ## Required credentials and permissions
