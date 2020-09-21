@@ -138,8 +138,8 @@ def run_list_arns(args):
 
 
 def run_desc_metadata(args):
-    state = safecast_deploy.state.State(args.app)
-    pprint.PrettyPrinter(stream=sys.stderr).pprint(state.env_metadata)
+    state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
+    pprint.PrettyPrinter(stream=sys.stderr).pprint(state.old_aws_state)
 
 
 def run_desc_template(args):

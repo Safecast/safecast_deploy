@@ -1,35 +1,37 @@
 from dataclasses import dataclass
-from enum import Enum
-from env_type import EnvType
+from enum import Enum, unique
+from safecast_deploy import env_type
 
 
-@dataclass(frozen=True)
-class AwsState:
-    aws_app_name: str
-    envs: Dict[EnvType, Dict[AwsTierType, AwsTier]]
-
-
-@dataclass(frozen=True)
-class AwsTier:
-    tier: AwsTierType
-    arn: str
-    version: str
-    name: str
-    num: int
-    parsed_version: ParsedVersion
-
-
-@dataclass(frozen=True)
-class ParsedVersion:
-    app: str
-    circle_ci_build_num: int
-    clean_branch_name: str
-    git_commit: str
-
-
+@unique
 class AwsTierType(Enum):
     WEB = 'web'
     WORKER = 'wrk'
 
     def __repr__(self):
         return '<%s.%s>' % (self.__class__.__name__, self.name)
+
+
+@dataclass(frozen=True)
+class ParsedVersion:
+    app: str
+    circleci_build_num: int
+    clean_branch_name: str
+    git_commit: str
+    version_string: str
+
+
+@dataclass(frozen=True)
+class AwsState:
+    aws_app_name: str
+    envs: dict
+
+
+@dataclass(frozen=True)
+class AwsTier:
+    tier_type: AwsTierType
+    platform_arn: str
+    version: str
+    parsed_version: ParsedVersion
+    name: str
+    num: int

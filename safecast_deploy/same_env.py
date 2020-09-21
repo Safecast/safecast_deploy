@@ -2,8 +2,8 @@ import datetime
 import pprint
 import sys
 
-from aws_state import AwsTierType
-from safecast_deploy import git_logger, verbose_sleep
+from safecast_deploy import aws_state, git_logger, verbose_sleep
+from safecast_deploy.aws_state import AwsTierType
 
 
 class SameEnv:
@@ -57,8 +57,8 @@ class SameEnv:
             'ingest': 'ingest',
             'reporting': 'reporting',
         }
-        if old_tier.parsed_version.git_commit is not None
-           and new_tier.parsed_version.git_commit is not None:
+        if (not old_tier.parsed_version.git_commit is None) \
+           and (not new_tier.parsed_version.git_commit is None):
             result[new_tier.tier.value]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}...{}'.format(
                 repo_names[self.old_aws_state.aws_app_name],
                 old_tier.parsed_version.git_commit,
