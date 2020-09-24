@@ -1,7 +1,7 @@
 from enum import Enum, unique
 
 @unique
-class EnvType(Enum):
+class EnvType(str, Enum):
     DEV = 'dev'
     PROD = 'prd'
 

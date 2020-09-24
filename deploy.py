@@ -10,6 +10,7 @@ if sys.version_info.major < 3 or sys.version_info.minor < 8:
 
 import argparse
 import boto3
+import json
 import pprint
 import re
 import safecast_deploy
@@ -139,7 +140,7 @@ def run_list_arns(args):
 
 def run_desc_metadata(args):
     state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
-    pprint.PrettyPrinter(stream=sys.stderr).pprint(state.old_aws_state)
+    print(json.dumps(state.old_aws_state.to_dict(), sort_keys=True, indent=2))
 
 
 def run_desc_template(args):

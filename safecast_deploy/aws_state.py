@@ -1,10 +1,11 @@
 from dataclasses import dataclass
+from dataclasses_json import dataclass_json
 from enum import Enum, unique
 from safecast_deploy import env_type
 
 
 @unique
-class AwsTierType(Enum):
+class AwsTierType(str, Enum):
     WEB = 'web'
     WORKER = 'wrk'
 
@@ -12,6 +13,7 @@ class AwsTierType(Enum):
         return '<%s.%s>' % (self.__class__.__name__, self.name)
 
 
+@dataclass_json
 @dataclass(frozen=True)
 class ParsedVersion:
     app: str
@@ -21,12 +23,14 @@ class ParsedVersion:
     version_string: str
 
 
+@dataclass_json
 @dataclass(frozen=True)
 class AwsState:
     aws_app_name: str
     envs: dict
 
 
+@dataclass_json
 @dataclass(frozen=True)
 class AwsTier:
     tier_type: AwsTierType
