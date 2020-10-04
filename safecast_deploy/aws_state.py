@@ -1,7 +1,15 @@
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 from enum import Enum, unique
-from safecast_deploy import env_type
+
+
+@unique
+class EnvType(str, Enum):
+    DEV = 'dev'
+    PROD = 'prd'
+
+    def __repr__(self):
+        return '<%s.%s>' % (self.__class__.__name__, self.name)
 
 
 @unique
@@ -27,7 +35,7 @@ class ParsedVersion:
 @dataclass(frozen=True)
 class AwsState:
     aws_app_name: str
-    envs: dict
+    envs: dict  # dictionary mapping EnvTypes to a nested dictionary of AwsTierTypes to AwsTier objects
 
 
 @dataclass_json

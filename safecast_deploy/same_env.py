@@ -4,16 +4,20 @@ import sys
 
 from safecast_deploy import aws_state, git_logger, verbose_sleep
 from safecast_deploy.aws_state import AwsTierType
+from safecast_deploy.exceptions import EnvNotHealthyException
 
 
 class SameEnv:
-    def __init__(self, old_aws_state, new_aws_state, eb_client):
-        self.old_aws_state = old_aws_state
-        self.new_aws_state = new_aws_state
+    def __init__(self, env, old_aws_state, new_aws_state, eb_client):
+        self.env = env
+        self.old_aws_state = old_aws_state.envs[env]
+        self.new_aws_state = new_aws_state.envs[env]
         self._c = eb_client
 
     def run(self):
         self.start_time = datetime.datetime.now(datetime.timezone.utc)
+
+        self._check_environments()
 
         # Handle the worker tier first, to ensure that database
         # migrations are applied
@@ -23,6 +27,21 @@ class SameEnv:
         result = self._generate_result()
         self._print_result(result)
         git_logger.log_result(result)
+
+    # Make sure we're not trying to deploy on top of an environment in distress
+    def _check_environments(self):
+        for tier_type, tier in self.old_aws_state.envs:
+            env_name = tier.name
+            health = self._c.describe_environment_health(
+                EnvironmentName=env_name,
+                AttributeNames=['HealthStatus', ]
+            )['HealthStatus']
+            if health != 'Ok':
+                raise EnvNotHealthyException(
+                    f"Environment {env_name} has a health status of {health} and cannot be deployed to.",
+                    env_name,
+                    health
+                )
 
     def _generate_result(self):
         completed_time = datetime.datetime.now(datetime.timezone.utc)
@@ -57,8 +76,8 @@ class SameEnv:
             'ingest': 'ingest',
             'reporting': 'reporting',
         }
-        if (not old_tier.parsed_version.git_commit is None) \
-           and (not new_tier.parsed_version.git_commit is None):
+        if (old_tier.parsed_version.git_commit is not None) \
+           and (new_tier.parsed_version.git_commit is not None):
             result[new_tier.tier.value]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}...{}'.format(
                 repo_names[self.old_aws_state.aws_app_name],
                 old_tier.parsed_version.git_commit,

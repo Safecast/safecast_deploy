@@ -5,10 +5,10 @@ import re
 import sys
 
 from safecast_deploy import aws_state
-from safecast_deploy.aws_state import AwsState, AwsTier, ParsedVersion, AwsTierType
-from safecast_deploy.env_type import EnvType
+from safecast_deploy.aws_state import AwsState, AwsTier, ParsedVersion, EnvType, AwsTierType
 from safecast_deploy.exceptions import InvalidVersionException
 from functools import lru_cache
+
 
 class State:
     def __init__(self, aws_app_name, eb_client):
@@ -30,9 +30,9 @@ class State:
         for (env_type, tier_dict) in old_aws_state.envs:
             for (tier_type, tier) in tier_dict:
                 new_tier = dataclasses.replace(tier)
-                if not new_version is None:
+                if new_version is not None:
                     new_tier = dataclasses.replace(new_tier, version=new_version, parsed_version=parsed_version)
-                if not new_arn is None:
+                if new_arn is not None:
                     new_tier = dataclasses.replace(new_tier, platform_arn=new_arn)
                 new_envs[env_type][tier_type] = new_tier
         return dataclasses.replace(old_aws_state, envs=envs)
@@ -57,7 +57,7 @@ class State:
         git_commit = None
         if git_match:
             match = git_match
-            git_commit=match.group('commit')
+            git_commit = match.group('commit')
         elif no_git_match:
             match = no_git_match
             # TODO: var is undefined if an `eb deploy` bundle is in use, would be good have a fallback for that case
@@ -71,7 +71,7 @@ class State:
 
     def _build_envs(self):
         api_envs = self._c.describe_environments(
-        ApplicationName=self.aws_app_name,
+            ApplicationName=self.aws_app_name,
             IncludeDeleted=False,
         )['Environments']
         name_pattern = re.compile('safecast' + self.aws_app_name + r'-(?P<env>(dev|dev-wrk|prd|prd-wrk))-(?P<num>\d{3})')
@@ -104,13 +104,13 @@ class State:
         return envs
 
     def _classify_available_versions(self):
-            self.api_versions = sorted(
-                self._c.describe_application_versions(
-                    ApplicationName=self.aws_app_name
-                )['ApplicationVersions'],
-                key=lambda i: i['DateUpdated'],
-            )
-            self.available_versions = [o['VersionLabel'] for o in self.api_versions
+        self.api_versions = sorted(
+            self._c.describe_application_versions(
+                ApplicationName=self.aws_app_name
+            )['ApplicationVersions'],
+            key=lambda i: i['DateUpdated'],
+        )
+        self.available_versions = [o['VersionLabel'] for o in self.api_versions
                                    if o['Status'] != 'FAILED']
-            self.failed_versions = [o['VersionLabel'] for o in self.api_versions
+        self.failed_versions = [o['VersionLabel'] for o in self.api_versions
                                 if o['Status'] == 'FAILED']
