@@ -22,6 +22,8 @@ import safecast_deploy.ssh
 import safecast_deploy.state
 import time
 
+from safecast_deploy.result_logger import ResultLogger
+
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -140,7 +142,8 @@ def run_list_arns(args):
 
 def run_desc_metadata(args):
     state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
-    print(json.dumps(state.old_aws_state.to_dict(), sort_keys=True, indent=2))
+    json.dump(state.old_aws_state.to_dict(), sys.stdout, sort_keys=True, indent=2)
+    print()
 
 
 def run_desc_template(args):
@@ -163,13 +166,13 @@ def run_new_env(args):
 
 
 def run_same_env(args):
-    state = safecast_deploy.state.State(
-        args.app,
-        args.env,
-        boto3.client('elasticbeanstalk'),
-        new_version=args.version,
-    )
-    safecast_deploy.same_env.SameEnv(state).run()
+    state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
+    safecast_deploy.same_env.SameEnv(
+        old_aws_state=state.old_aws_state,
+        new_aws_state=state.new_aws_state(new_version=args.version),
+        eb_client=boto3.client('elasticbeanstalk'),
+        result_logger=ResultLogger()
+    ).run()
 
 
 def run_ssh(args):

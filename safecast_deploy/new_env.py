@@ -2,14 +2,15 @@ import datetime
 import pprint
 import sys
 
-from safecast_deploy import config_saver, git_logger, verbose_sleep
+from safecast_deploy import config_saver, verbose_sleep
 
 
 class NewEnv:
-    def __init__(self, state, update_templates):
+    def __init__(self, state, update_templates, result_logger):
         self.state = state
         self._c = state.eb_client
         self.update_templates = update_templates
+        self.result_logger = result_logger
 
     def run(self):
         self.start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -24,8 +25,7 @@ class NewEnv:
             self._handle_worker()
         self._handle_web()
         result = self._generate_result()
-        self._print_result(result)
-        git_logger.log_result(result)
+        result_logger.log_result(result)
 
     def _handle_worker(self):
         # First, turn off the current worker to avoid any concurrency issues

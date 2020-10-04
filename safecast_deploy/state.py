@@ -23,18 +23,17 @@ class State:
         )
 
     @lru_cache(typed=True)
-    def new_aws_state(self, new_version=None, new_arn=None):
+    def new_aws_state(self, target_env_type, new_version=None, new_arn=None):
         self._validate_version(new_version)
         parsed_version = self._parse_version(new_version)
         new_envs = collections.defaultdict(dict)
-        for (env_type, tier_dict) in old_aws_state.envs:
-            for (tier_type, tier) in tier_dict:
-                new_tier = dataclasses.replace(tier)
-                if new_version is not None:
-                    new_tier = dataclasses.replace(new_tier, version=new_version, parsed_version=parsed_version)
-                if new_arn is not None:
-                    new_tier = dataclasses.replace(new_tier, platform_arn=new_arn)
-                new_envs[env_type][tier_type] = new_tier
+        for (tier_type, tier) in old_aws_state.envs[target_env_type]:
+            new_tier = dataclasses.replace(tier)
+            if new_version is not None:
+                new_tier = dataclasses.replace(new_tier, version=new_version, parsed_version=parsed_version)
+            if new_arn is not None:
+                new_tier = dataclasses.replace(new_tier, platform_arn=new_arn)
+            new_envs[target_env_type][tier_type] = new_tier
         return dataclasses.replace(old_aws_state, envs=envs)
 
     def _validate_version(self, version):

@@ -16,3 +16,10 @@ class EnvNotHealthyException(Exception):
         self.message = message
         self.env_name = env_name
         self.health = health
+
+
+class EnvUpdateTimedOutException(Exception):
+    def __init__(self, message, env_name, timeout_length):
+        self.message = message
+        self.env_name = env_name
+        self.health = health

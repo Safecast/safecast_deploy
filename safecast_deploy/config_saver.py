@@ -2,7 +2,7 @@ import datetime
 import pprint
 import sys
 
-from safecast_deploy import git_logger, state, verbose_sleep
+from safecast_deploy import state, verbose_sleep
 
 
 def run_cli(args):
@@ -10,7 +10,7 @@ def run_cli(args):
 
 
 class ConfigSaver:
-    def __init__(self, app=None, env=None, role=None):
+    def __init__(self, result_logger, app=None, env=None, role=None):
         self.app = app
         self.env = env
         self.role = role
@@ -33,8 +33,7 @@ class ConfigSaver:
                 self.process_app('ingest')
             else:
                 self.process_app(app)
-        git_logger.log_result(self.completed_list)
-        pprint.PrettyPrinter(stream=sys.stderr).pprint(self.completed_list)
+        result_logger.log_result(self.completed_list)
 
     def process_app(self, app):
         if self.env is None:
