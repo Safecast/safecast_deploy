@@ -29,3 +29,9 @@ Help on specific commands can be found by using `--help` with that command: `./d
 The scripts currently assume that a previous environment already exists, in all cases.
 
 When `new_env` is called, safecast_deploy creates a new environment from the existing application configuration templates stored in Elastic Beanstalk and named `dev`, `dev-wrk`, `prd`, `prd-wrk`, etc. The `new_env` command will set a new ARN for the environment; however, that new ARN is not saved back to the application template. This is not generally a problem, especially if we continue to use this tool for all new deployments. However, it does mean that the saved template does not accurately reflect what is being run any longer. We could create a task in the future to synchronize the saved templates to what is actually running.
+
+## Development
+
+Unit tests can be run with `python -m unittest`.
+
+Please run `pycodestyle` before committing.

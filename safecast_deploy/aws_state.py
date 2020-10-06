@@ -5,6 +5,8 @@ from enum import Enum, unique
 
 @unique
 class EnvType(str, Enum):
+    """Encodes Safecast's understanding of environment types.
+    """
     DEV = 'dev'
     PROD = 'prd'
 
@@ -43,7 +45,6 @@ class AwsState:
 class AwsTier:
     tier_type: AwsTierType
     platform_arn: str
-    version: str
     parsed_version: ParsedVersion
     name: str
     num: int
