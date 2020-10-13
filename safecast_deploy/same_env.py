@@ -8,14 +8,16 @@ from safecast_deploy.exceptions import EnvNotHealthyException, EnvUpdateTimedOut
 
 
 class SameEnv:
-    # TODO move state from init to run
-    def __init__(self, target_env_type, old_aws_state, new_aws_state, eb_client, result_logger):
+    def __init__(self, target_env_type, old_aws_state, new_aws_state, eb_client, result_logger,
+                 update_wait=70, total_update_wait=480):
         self.target_env_type = target_env_type
         self.aws_app_name = old_aws_state.aws_app_name
         self.old_aws_env_state = old_aws_state.envs[target_env_type]
         self.new_aws_env_state = new_aws_state.envs[target_env_type]
         self._c = eb_client
         self._result_logger = result_logger
+        self._update_wait = update_wait
+        self._total_update_wait = total_update_wait
 
     def run(self):
         self.start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -104,10 +106,10 @@ class SameEnv:
         self._wait_for_green(env_name)
 
     def _wait_for_green(self, env_name):
-        print(f"Waiting for {env_name} health to return to normal.", file=sys.stderr)
-        verbose_sleep(1)
+        print(f"Waiting for {env_name} health to return to normal. Waiting {self._update_wait} seconds before first check to ensure an accurate starting point.", file=sys.stderr)
+        verbose_sleep(self._update_wait)
         wait_seconds = 0
-        while wait_seconds < 480:
+        while wait_seconds < self._total_update_wait:
             health = self._c.describe_environment_health(
                 EnvironmentName=env_name,
                 AttributeNames=['HealthStatus', ]
@@ -115,9 +117,9 @@ class SameEnv:
             if health == 'Ok':
                 print(f"{env_name} health has returned to normal.", file=sys.stderr)
                 return
-            verbose_sleep(40)
-            wait_seconds += 40
+            verbose_sleep(self._update_wait)
+            wait_seconds += self._update_wait
         raise EnvUpdateTimedOutException(
-            "f{env_name} health did not return to normal within 480 seconds.",
-            env_name, 480
+            "f{env_name} health did not return to normal within f{self._total_update_wait} seconds.",
+            env_name, self._total_update_wait
         )

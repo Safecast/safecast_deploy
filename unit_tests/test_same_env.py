@@ -57,4 +57,4 @@ class TestSameEnv(unittest.TestCase):
         eb_client.update_environment = MagicMock()
         result_logger = ResultLogger()
         result_logger.log_result = MagicMock()
-        SameEnv(EnvType.DEV, old_aws_state, new_aws_state, eb_client, result_logger).run()
+        SameEnv(EnvType.DEV, old_aws_state, new_aws_state, eb_client, result_logger, update_wait=1).run()
