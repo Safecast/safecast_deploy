@@ -160,9 +160,12 @@ def run_new_env(args):
         args.app,
         args.env,
         new_version=args.version,
-        new_arn=args.arn
+        new_arn=args.arn,
     )
-    safecast_deploy.new_env.NewEnv(state, not args.no_update_templates).run()
+    config_saver = safecast_deploy.config_saver.ConfigSaver(
+        app=args.app, env=args.env
+    )
+    safecast_deploy.new_env.NewEnv(state, not args.no_update_templates, config_saver=config_saver).run()
 
 
 def run_same_env(args):

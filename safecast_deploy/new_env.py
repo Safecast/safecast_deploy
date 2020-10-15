@@ -2,37 +2,71 @@ import datetime
 import pprint
 import sys
 
-from safecast_deploy import config_saver, verbose_sleep
+from safecast_deploy import verbose_sleep
+from safecast_deploy.aws_state import AwsTierType
+from safecast_deploy.exceptions import EnvUpdateTimedOutException
 
 
 class NewEnv:
-    def __init__(self, state, update_templates, result_logger):
-        self.state = state
-        self._c = state.eb_client
-        self.update_templates = update_templates
-        self.result_logger = result_logger
+    def __init__(self, target_env_type, old_aws_state, new_aws_state, eb_client, result_logger,
+                 config_saver, update_templates, update_wait=70, total_update_wait=480):
+        self._target_env_type = target_env_type
+        self._aws_app_name = old_aws_state.aws_app_name
+        self._old_aws_env_state = old_aws_state.envs[target_env_type]
+        self._new_aws_env_state = new_aws_state.envs[target_env_type]
+        self._c = eb_client
+        self._result_logger = result_logger
+        self._config_saver = config_saver
+        self._update_templates = update_templates
+        self._update_wait = update_wait
+        self._total_update_wait = total_update_wait
 
     def run(self):
-        self.start_time = datetime.datetime.now(datetime.timezone.utc)
-        if self.update_templates:
-            config_saver.ConfigSaver(
-                app=self.state.app, env=self.state.env
-            ).run()
-        # Handle the worker environment first, to ensure that database
-        # migrations are applied
-        self._calculate_new_envs()
-        if self.state.has_worker:
-            self._handle_worker()
-        self._handle_web()
-        result = self._generate_result()
-        result_logger.log_result(result)
+        self._start_time = datetime.datetime.now(datetime.timezone.utc)
+        if self._update_templates:
+            self._config_saver.run()
 
-    def _handle_worker(self):
-        # First, turn off the current worker to avoid any concurrency issues
-        print("Setting the worker tier to scale to 0.", file=sys.stderr)
+        # Handle the worker tier first, to ensure that database
+        # migrations are applied
+        if AwsTierType.WORKER in self._old_aws_env_state:
+            self._handle_tier(self._old_aws_env_state[AwsTierType.WORKER], self._new_aws_env_state[AwsTierType.WORKER])
+        self._handle_tier(self._old_aws_env_state[AwsTierType.WEB], self._new_aws_env_state[AwsTierType.WEB])
+
+        result = self._generate_result()
+        self._result_logger.log_result(result)
+
+    def _handle_tier(self, old_tier, new_tier):
+        template_name = f'{self._target_env_type}' if old_tier.tier_type is AwsTierType.WEB else f'{self._target_env_type}-{old_tier.tier_type}'
+
+        if old_tier.tier_type is AwsTierType.WORKER:
+            print("Setting the worker tier to scale to 0, in order to stop it and avoid concurrent processing problems.", file=sys.stderr)
+            self._stop_tier(self._aws_app_name, old_tier.name)
+
+        print(f"Creating the new environment {new_tier.name}.", file=sys.stderr)
+        self._c.create_environment(
+            ApplicationName=self._aws_app_name,
+            EnvironmentName=new_tier.name,
+            PlatformArn=new_tier.platform_arn,
+            TemplateName=template_name,
+            VersionLabel=new_tier.parsed_version.version_string,
+        )
+        self._wait_for_green(new_tier.name)
+
+        if new_tier.tier_type is AwsTierType.WEB:
+            print("Swapping web environment CNAMEs.", file=sys.stderr)
+            self._c.swap_environment_cnames(
+                SourceEnvironmentName=old_tier.name,
+                DestinationEnvironmentName=new_tier.name,
+            )
+
+        verbose_sleep(self._update_wait)
+        print(f"Terminating the old environment {old_tier.name}.", file=sys.stderr)
+        self._c.terminate_environment(EnvironmentName=old_tier.name)
+
+    def _stop_tier(self, app_name, tier_name):
         self._c.update_environment(
-            ApplicationName=self.state.app,
-            EnvironmentName=self.state.env_metadata[self.state.subenvs['wrk']]['name'],
+            ApplicationName=app_name,
+            EnvironmentName=tier_name,
             OptionSettings=[
                 {
                     'ResourceName': 'AWSEBAutoScalingGroup',
@@ -46,130 +80,68 @@ class NewEnv:
                     'OptionName': 'MinSize',
                     'Value': '0'
                 },
-            ])
+            ],
+        )
         verbose_sleep(480)
-        print("Creating the new worker environment.", file=sys.stderr)
-        self._c.create_environment(
-            ApplicationName=self.state.app,
-            EnvironmentName=self.new_env_metadata['wrk']['name'],
-            PlatformArn=self.state.new_arn,
-            TemplateName=self.state.subenvs['wrk'],
-            VersionLabel=self.state.new_version,
-        )
-        self._wait_for_green(self.new_env_metadata['wrk']['name'])
-        print("Terminating the old worker environment.", file=sys.stderr)
-        self._c.terminate_environment(EnvironmentName=self.state.env_metadata[self.state.subenvs['wrk']]['name'])
-
-    def _handle_web(self):
-        print("Creating the new Web environment.", file=sys.stderr)
-        self._c.create_environment(
-            ApplicationName=self.state.app,
-            EnvironmentName=self.new_env_metadata['web']['name'],
-            PlatformArn=self.state.new_arn,
-            TemplateName=self.state.subenvs['web'],
-            VersionLabel=self.state.new_version,
-        )
-        self._wait_for_green(self.new_env_metadata['web']['name'])
-        print("Swapping web environment CNAMEs.", file=sys.stderr)
-        self._c.swap_environment_cnames(
-            SourceEnvironmentName=self.state.env_metadata[self.state.subenvs['web']]['name'],
-            DestinationEnvironmentName=self.new_env_metadata['web']['name'],
-        )
-        verbose_sleep(120)
-        print("Terminating the old web environment.", file=sys.stderr)
-        self._c.terminate_environment(EnvironmentName=self.state.env_metadata[self.state.subenvs['web']]['name'])
 
     def _generate_result(self):
         completed_time = datetime.datetime.now(datetime.timezone.utc)
         result = {
-            'app': self.state.app,
+            'app': self._aws_app_name,
             'completed_at': completed_time,
-            'elapsed_time': (completed_time - self.start_time).total_seconds(),
-            'env': self.state.env,
+            'elapsed_time': (completed_time - self._start_time).total_seconds(),
+            'env': self._target_env_type.value,
             'event': 'new_env',
-            'started_at': self.start_time,
-            'web': {
-                'new_env': self.new_env_metadata['web']['name'],
-                'new_version': self.state.new_version,
-                'new_version_parsed': self.state.new_versions_parsed['web'],
-                'old_env': self.state.env_metadata[self.state.subenvs['web']]['name'],
-                'old_version': self.state.env_metadata[self.state.subenvs['web']]['version'],
-                'old_version_parsed': self.state.old_versions_parsed['web'],
-            },
-
+            'started_at': self._start_time,
         }
-        self._add_git('web', result)
-
-        if self.state.has_worker:
-            result['wrk'] = {
-                'env': self.state.env_metadata[self.state.subenvs['wrk']]['name'],
-                'new_version': self.state.new_version,
-                'new_version_parsed': self.state.new_versions_parsed['wrk'],
-                'old_version': self.state.env_metadata[self.state.subenvs['wrk']]['version'],
-                'old_version_parsed': self.state.old_versions_parsed['wrk'],
-            }
-            self._add_git('wrk', result)
-
+        for new_tier_type, new_tier in self._new_aws_env_state.items():
+            old_tier = self._old_aws_env_state[new_tier_type]
+            result.update(
+                {
+                    f'{new_tier_type.value}': {
+                        'new_env': new_tier.name,
+                        'new_version_parsed': new_tier.parsed_version.to_dict(),
+                        'old_env': old_tier.name,
+                        'old_version_parsed': old_tier.parsed_version.to_dict(),
+                    }
+                }
+            )
+            self._add_git(new_tier_type, old_tier, new_tier, result)
         return result
 
-    def _add_git(self, tier, result):
+    def _add_git(self, new_tier_type, old_tier, new_tier, result):
+        # TODO move this out into a config file
         repo_names = {
             'api': 'safecastapi',
             'ingest': 'ingest',
             'reporting': 'reporting',
         }
-        if 'git_commit' in self.state.old_versions_parsed[tier] \
-           and 'git_commit' in self.state.new_versions_parsed[tier]:
-            result[tier]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}...{}'.format(
-                repo_names[self.state.app],
-                self.state.old_versions_parsed[tier]['git_commit'],
-                self.state.new_versions_parsed[tier]['git_commit']
+        if (old_tier.parsed_version.git_commit is not None) \
+           and (new_tier.parsed_version.git_commit is not None):
+            result[new_tier_type.value]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}...{}'.format(
+                repo_names[self._aws_app_name],
+                old_tier.parsed_version.git_commit,
+                new_tier.parsed_version.git_commit,
             )
 
-    def _print_result(self, result):
-        pprint.PrettyPrinter(stream=sys.stderr).pprint(result)
-        print("Deployment completed.", file=sys.stderr)
-
-    def _calculate_new_envs(self):
-        new_num = self._balance_env_num()
-        self.new_env_metadata = {
-            'web': {
-                'name': 'safecast{app}-{env}-{num:03}'.format(
-                    app=self.state.app,
-                    env=self.state.env,
-                    num=new_num
-                )
-            },
-            'wrk': {
-                'name': 'safecast{app}-{env}-wrk-{num:03}'.format(
-                    app=self.state.app,
-                    env=self.state.env,
-                    num=new_num
-                )
-            },
-        }
-
-    def _balance_env_num(self):
-        web_num = (self.state.env_metadata[self.state.subenvs['web']]['num'] + 1) % 1000
-        if self.state.has_worker:
-            wrk_num = (self.state.env_metadata[self.state.subenvs['wrk']]['num'] + 1) % 1000
-            return max(web_num, wrk_num)
-        else:
-            return web_num
-
     def _wait_for_green(self, env_name):
-        verbose_sleep(70)
+        print(
+            f"Waiting for {env_name} health to return to normal. Waiting {self._update_wait} seconds before first check to ensure an accurate starting point.",
+            file=sys.stderr
+        )
+        verbose_sleep(self._update_wait)
         wait_seconds = 0
-        while wait_seconds < 540:
+        while wait_seconds < self._total_update_wait:
             health = self._c.describe_environment_health(
                 EnvironmentName=env_name,
                 AttributeNames=['HealthStatus', ]
             )['HealthStatus']
             if health == 'Ok':
-                print("Environment health has returned to normal.", file=sys.stderr)
+                print(f"{env_name} health has returned to normal.", file=sys.stderr)
                 return
-            verbose_sleep(40)
-            wait_seconds += 40
-        print("Environment health did not return to normal within 540 seconds. Aborting further operations.",
-              file=sys.stderr)
-        exit(1)
+            verbose_sleep(self._update_wait)
+            wait_seconds += self._update_wait
+        raise EnvUpdateTimedOutException(
+            "f{env_name} health did not return to normal within f{self._total_update_wait} seconds.",
+            env_name, self._total_update_wait
+        )

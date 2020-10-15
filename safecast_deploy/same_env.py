@@ -10,10 +10,10 @@ from safecast_deploy.exceptions import EnvNotHealthyException, EnvUpdateTimedOut
 class SameEnv:
     def __init__(self, target_env_type, old_aws_state, new_aws_state, eb_client, result_logger,
                  update_wait=70, total_update_wait=480):
-        self.target_env_type = target_env_type
-        self.aws_app_name = old_aws_state.aws_app_name
-        self.old_aws_env_state = old_aws_state.envs[target_env_type]
-        self.new_aws_env_state = new_aws_state.envs[target_env_type]
+        self._target_env_type = target_env_type
+        self._aws_app_name = old_aws_state.aws_app_name
+        self._old_aws_env_state = old_aws_state.envs[target_env_type]
+        self._new_aws_env_state = new_aws_state.envs[target_env_type]
         self._c = eb_client
         self._result_logger = result_logger
         self._update_wait = update_wait
@@ -34,7 +34,7 @@ class SameEnv:
 
     # Make sure we're not trying to deploy on top of an environment in distress
     def _check_environments(self):
-        for tier_type, tier in self.old_aws_env_state.items():
+        for tier_type, tier in self._old_aws_env_state.items():
             health = self._c.describe_environment_health(
                 EnvironmentName=tier.name,
                 AttributeNames=['HealthStatus', ]
@@ -49,21 +49,19 @@ class SameEnv:
     def _generate_result(self):
         completed_time = datetime.datetime.now(datetime.timezone.utc)
         result = {
-            'app': self.aws_app_name,
+            'app': self._aws_app_name,
             'completed_at': completed_time,
             'elapsed_time': (completed_time - self.start_time).total_seconds(),
-            'env': self.target_env_type.value,
+            'env': self._target_env_type.value,
             'event': 'same_env',
             'started_at': self.start_time,
         }
-        for new_tier_type, new_tier in self.new_aws_env_state.items():
-            old_tier = self.old_aws_env_state[new_tier_type]
+        for new_tier_type, new_tier in self._new_aws_env_state.items():
+            old_tier = self._old_aws_env_state[new_tier_type]
             result.update(
                 {
                     f'{new_tier_type.value}': {
-                        'new_version': new_tier.parsed_version.version_string,
                         'new_version_parsed': new_tier.parsed_version.to_dict(),
-                        'old_version': old_tier.parsed_version.version_string,
                         'old_version_parsed': old_tier.parsed_version.to_dict(),
                     },
                 }
@@ -82,7 +80,7 @@ class SameEnv:
         if (old_tier.parsed_version.git_commit is not None) \
            and (new_tier.parsed_version.git_commit is not None):
             result[new_tier_type.value]['github_diff'] = 'https://github.com/Safecast/{}/compare/{}...{}'.format(
-                repo_names[self.aws_app_name],
+                repo_names[self._aws_app_name],
                 old_tier.parsed_version.git_commit,
                 new_tier.parsed_version.git_commit,
             )
@@ -92,21 +90,24 @@ class SameEnv:
         print("Deployment completed.", file=sys.stderr)
 
     def _update_environment(self, tier):
-        if tier not in self.new_aws_env_state:
+        if tier not in self._new_aws_env_state:
             return
 
         print(f"Deploying to the {tier.value} tier.", file=sys.stderr)
-        env_name = self.new_aws_env_state[tier].name
+        env_name = self._new_aws_env_state[tier].name
         self._c.update_environment(
-            ApplicationName=self.aws_app_name,
+            ApplicationName=self._aws_app_name,
             EnvironmentName=env_name,
-            VersionLabel=self.new_aws_env_state[tier].parsed_version.version_string
+            VersionLabel=self._new_aws_env_state[tier].parsed_version.version_string
         )
 
         self._wait_for_green(env_name)
 
     def _wait_for_green(self, env_name):
-        print(f"Waiting for {env_name} health to return to normal. Waiting {self._update_wait} seconds before first check to ensure an accurate starting point.", file=sys.stderr)
+        print(
+            f"Waiting for {env_name} health to return to normal. Waiting {self._update_wait} seconds before first check to ensure an accurate starting point.",
+            file=sys.stderr
+        )
         verbose_sleep(self._update_wait)
         wait_seconds = 0
         while wait_seconds < self._total_update_wait:

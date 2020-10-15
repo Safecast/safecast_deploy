@@ -16,9 +16,10 @@ class Iso8601DateTimeEncoder(json.JSONEncoder):
 class ResultLogger():
     def __init__(self, stream=sys.stdout, log_git=True):
         self.log_git = log_git
+        self.stream = stream
 
     def log_result(self, result):
-        self.write_stream(result)
+        self._write_stream(result)
         if self.log_git:
             self.log_git(result)
 
