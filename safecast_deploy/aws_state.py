@@ -47,4 +47,5 @@ class AwsTier:
     platform_arn: str
     parsed_version: ParsedVersion
     name: str
+    environment_id: str  # Note this is calculated by AWS and will not be available prior to new environment creation
     num: int

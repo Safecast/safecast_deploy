@@ -37,6 +37,7 @@ class State:
                 new_tier = dataclasses.replace(
                     new_tier,
                     platform_arn=new_arn,
+                    environment_id=None,
                     name=f'safecast{old_aws_state.aws_app_name}-{target_env_type.value}-'
                     '{AwsTierType.WORKER.value + '-' if tier_type is AwsTierType.WORKER else ''}{new_env_num:03}',
                     num=new_env_num
@@ -97,8 +98,8 @@ class State:
             tier = AwsTier(
                 tier_type=tier_type,
                 platform_arn=api_env['PlatformArn'],
-                version=api_env['VersionLabel'],
                 parsed_version=self._parse_version(api_env['VersionLabel']),
+                environment_id=api_env['EnvironmentId'],
                 name=api_env['EnvironmentName'],
                 num=int(match.group('num')),
             )

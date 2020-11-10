@@ -25,6 +25,7 @@ class TestSameEnv(unittest.TestCase):
                             git_commit='5fcc3edf43a0adf59efb74f84dc2fbc455bedc74',
                             version_string='api-unit_test-123-5fcc3edf43a0adf59efb74f84dc2fbc455bedc74',
                         ),
+                        environment_id='98765',
                         name='unit-test-env-021',
                         num=21,
                     )
@@ -46,6 +47,7 @@ class TestSameEnv(unittest.TestCase):
                             git_commit='6b69384109c6f3348ccaf4d5e761808f710bd6a9',
                             version_string='api-unit_test-125-6b69384109c6f3348ccaf4d5e761808f710bd6a9',
                         ),
+                        environment_id=None,
                         name='unit-test-env-021',
                         num=21,
                     )

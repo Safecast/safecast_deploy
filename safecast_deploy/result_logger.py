@@ -21,7 +21,7 @@ class ResultLogger():
     def log_result(self, result):
         self._write_stream(result)
         if self.log_git:
-            self.log_git(result)
+            self._log_git(result)
 
     def _log_git(self, result):
         with tempfile.TemporaryDirectory() as temp_dir:

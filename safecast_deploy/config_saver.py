@@ -1,64 +1,61 @@
+import boto3
 import datetime
 import pprint
 import sys
 
 from safecast_deploy import state, verbose_sleep
+from safecast_deploy.result_logger import ResultLogger
 
 
 def run_cli(args):
-    ConfigSaver(app=args.app, env=args.env, role=args.role).run()
+    app = args.app
+    env = EnvType(args.env) if args.env else None
+    tier = AwsTierType(args.tier) if args.env else None
+    ConfigSaver(boto3.client('elasticbeanstalk'), ResultLogger()).run(app=app, env=env, tier=tier)
 
 
 class ConfigSaver:
-    def __init__(self, result_logger, app=None, env=None, role=None):
-        self.app = app
-        self.env = env
-        self.role = role
-        self.states = {}
+    def __init__(self, eb_client, result_logger):
+        self._c = eb_client
+        self._result_logger = result_logger
+
+    def run(self, app=None, env=None, tier=None):
+        all_apps = ['api', 'ingest', 'recording']
+        states = {}
         if app is None:
-            self.states['api'] = state.State('api')
-            self.states['ingest'] = state.State('ingest')
-            self.states['reporting'] = state.State('reporting')
-            self._c = self.states['api'].eb_client
+            for default_app in all_apps:
+                states[default_app] = state.State(default_app, self._c)
         else:
-            self.states[app] = state.State(app)
-            self._c = self.states[app].eb_client
-        self.completed_list = []
+            self.states[app] = state.State(app, self._c)
 
-    def run(self):
-        for app in self.states:
-            env_metadata = self.states[app].env_metadata
-            if self.app is None:
-                self.process_app('api')
-                self.process_app('ingest')
-            else:
-                self.process_app(app)
-        result_logger.log_result(self.completed_list)
+        completed_list = []
+        for state in states:
+            state_result = self.process_state(states[state].old_aws_state, env, tier)
+            self._result_logger.log_result(state_result)
 
-    def process_app(self, app):
-        if self.env is None:
-            self.process_env(app, 'dev')
-            self.process_env(app, 'prd')
+    def process_state(self, state, env, tier):
+        if env is None:
+            for default_env in list(EnvType):
+                self.process_env(state, default_env, tier)
         else:
-            self.process_env(app, self.env)
+            self.process_env(state, env, tier)
 
-    def process_env(self, app, env):
+    def process_env(self, state, env, tier):
         template_names = {
-            'web': env,
-            'wrk': '{}-wrk'.format(env),
+            AwsTierType.WEB: env.value,
+            AwsTierType.WORKER: f'{env.value}-wrk',
         }
-        if self.role is None:
-            self.process_role(app, env, 'web', template_names)
-            if self.states[app].has_worker:
-                self.process_role(app, env, 'wrk', template_names)
+        if tier is None:
+            for default_tier in list(AwsTierType):
+                self.process_tier(state, env, default_tier, template_names)
         else:
-            self.process_role(app, env, self.role, template_names)
+            self.process_tier(state, env, tier, template_names)
 
-    def process_role(self, app, env, role, template_names):
+    def process_tier(self, state, env, tier, template_names):
         start_time = datetime.datetime.now(datetime.timezone.utc)
-        template_name = template_names[role]
-        env_id = self.states[app].env_metadata[template_name]['api_env']['EnvironmentId']
-        env_name = self.states[app].env_metadata[template_name]['name']
+        template_name = template_names[tier]
+        env_id = state[env][tier].environment_id
+        env_name = state[env][tier].name
         print(f"Starting update of template {template_name} from {env_name}", file=sys.stderr)
         self._c.delete_configuration_template(
             ApplicationName=app,
@@ -79,7 +76,8 @@ class ConfigSaver:
             'env': env,
             'event': 'save_configs',
             'role': role,
+            'source_env_id': env_id,
             'source_env_name': env_name,
             'started_at': start_time,
-            'template_name': template_name
+            'template_name': template_name,
         })
