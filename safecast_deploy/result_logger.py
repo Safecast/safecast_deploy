@@ -5,12 +5,7 @@ import os
 import sys
 import tempfile
 
-
-class Iso8601DateTimeEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, (datetime.datetime)):
-            return obj.isoformat()
-        return json.JSONEncoder.default(self, obj)
+from safecast_deploy.extended_json_encoder import ExtendedJSONEncoder
 
 
 class ResultLogger():
@@ -36,7 +31,7 @@ class ResultLogger():
         repo.remotes.origin.push()
 
     def _write_stream(self, result):
-        json.dump(result, self.stream, sort_keys=True, indent=2, cls=Iso8601DateTimeEncoder)
+        json.dump(result, self.stream, sort_keys=True, indent=2, cls=ExtendedJSONEncoder)
         print(file=self.stream)
 
     def _write_git_entry(self, result, temp_dir, repo):
@@ -53,5 +48,5 @@ class ResultLogger():
 
         history.insert(0, result)
         with open(log_file_path, 'w', encoding='utf-8', newline='\n') as f:
-            json.dump(history, f, indent=2, sort_keys=True, cls=Iso8601DateTimeEncoder)
+            json.dump(history, f, indent=2, sort_keys=True, cls=ExtendedJSONEncoder)
         repo.index.add(log_file_path)

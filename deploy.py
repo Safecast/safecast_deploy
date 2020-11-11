@@ -21,6 +21,7 @@ import safecast_deploy.state
 import time
 
 from safecast_deploy.aws_state import AwsTierType, EnvType
+from safecast_deploy.extended_json_encoder import ExtendedJSONEncoder
 from safecast_deploy.result_logger import ResultLogger
 
 
@@ -153,7 +154,8 @@ def run_desc_template(args):
         ApplicationName=args.app,
         TemplateName=args.template,
     )
-    pprint.PrettyPrinter(stream=sys.stderr).pprint(template)
+    json.dump(template, sys.stdout, sort_keys=True, indent=2, cls=ExtendedJSONEncoder)
+    print()
 
 
 def run_new_env(args):
