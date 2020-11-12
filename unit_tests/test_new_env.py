@@ -1,8 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
 
-import boto3
-
 from safecast_deploy.aws_state import AwsState, AwsTier, AwsTierType, EnvType, ParsedVersion
 from safecast_deploy.new_env import NewEnv
 from safecast_deploy.result_logger import ResultLogger

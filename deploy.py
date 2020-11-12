@@ -159,25 +159,29 @@ def run_desc_template(args):
 
 
 def run_new_env(args):
-    state = safecast_deploy.state.State(
-        args.app,
-        args.env,
-        new_version=args.version,
-        new_arn=args.arn,
-    )
-    config_saver = safecast_deploy.config_saver.ConfigSaver(
-        app=args.app, env=args.env
-    )
-    safecast_deploy.new_env.NewEnv(state, not args.no_update_templates, config_saver=config_saver).run()
+    eb_client = boto3.client('elasticbeanstalk')
+    result_logger = ResultLogger()
+    state = safecast_deploy.state.State(args.app, eb_client)
+    config_saver = safecast_deploy.config_saver.ConfigSaver(eb_client, result_logger)
+    safecast_deploy.new_env.NewEnv(
+        EnvType(args.env),
+        state.old_aws_state,
+        state.new_aws_state(new_version=args.version),
+        boto3.client('elasticbeanstalk'),
+        result_logger,
+        config_saver,
+        (not args.no_update_templates),
+    ).run()
 
 
 def run_same_env(args):
     state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
     safecast_deploy.same_env.SameEnv(
-        old_aws_state=state.old_aws_state,
-        new_aws_state=state.new_aws_state(new_version=args.version),
-        eb_client=boto3.client('elasticbeanstalk'),
-        result_logger=ResultLogger()
+        EnvType(args.env),
+        state.old_aws_state,
+        state.new_aws_state(new_version=args.version),
+        boto3.client('elasticbeanstalk'),
+        ResultLogger(),
     ).run()
 
 

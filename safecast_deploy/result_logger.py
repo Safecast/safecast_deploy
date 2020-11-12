@@ -24,9 +24,9 @@ class ResultLogger():
             # TODO automatically create dirs and files as necessary
             if isinstance(result, list):
                 for item in result:
-                    write_entry(item, temp_dir, repo)
+                    self.write_git_entry(item, temp_dir, repo)
             else:
-                write_entry(result, temp_dir, repo)
+                self.write_git_entry(result, temp_dir, repo)
         repo.index.commit("Updated entry.")
         repo.remotes.origin.push()
 
