@@ -27,23 +27,23 @@ class State:
         self._validate_version(new_version)
         parsed_version = self._parse_version(new_version)
         new_envs = collections.defaultdict(dict)
-        new_env_num = max([(tier.num + 1) % 1000 for (tier_type, tier) in self.old_aws_state.envs[target_env_type]], key=operator.itemgetter(1))
-        for (tier_type, tier) in self.old_aws_state.envs[target_env_type]:
+        for (tier_type, tier) in self.old_aws_state.envs[target_env_type].items():
             new_tier = dataclasses.replace(tier)
             if new_version is not None:
-                new_tier = dataclasses.replace(new_tier, version=new_version, parsed_version=parsed_version)
+                new_tier = dataclasses.replace(new_tier, parsed_version=parsed_version)
             if new_arn is not None:
                 # A new ARN implies a new environment
+                new_env_num = max([(tier.num + 1) % 1000 for tier in self.old_aws_state.envs[target_env_type].values()])
+                worker_name = (AwsTierType.WORKER.value + "-") if tier_type is AwsTierType.WORKER else ''
                 new_tier = dataclasses.replace(
                     new_tier,
                     platform_arn=new_arn,
                     environment_id=None,
-                    name=f'safecast{self.old_aws_state.aws_app_name}-{target_env_type.value}-'
-                    '{AwsTierType.WORKER.value + '-' if tier_type is AwsTierType.WORKER else ''}{new_env_num:03}',
+                    name=f'safecast{self.old_aws_state.aws_app_name}-{target_env_type.value}-{worker_name}{new_env_num:03}',
                     num=new_env_num
                 )
             new_envs[target_env_type][tier_type] = new_tier
-        return dataclasses.replace(self.old_aws_state, envs=envs)
+        return dataclasses.replace(self.old_aws_state, envs=new_envs)
 
     def _validate_version(self, version):
         if version is None:
