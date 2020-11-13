@@ -176,10 +176,11 @@ def run_new_env(args):
 
 def run_same_env(args):
     state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
+    env_type = EnvType(args.env)
     safecast_deploy.same_env.SameEnv(
-        EnvType(args.env),
+        env_type,
         state.old_aws_state,
-        state.new_aws_state(new_version=args.version),
+        state.new_aws_state(env_type, new_version=args.version),
         boto3.client('elasticbeanstalk'),
         ResultLogger(),
     ).run()
