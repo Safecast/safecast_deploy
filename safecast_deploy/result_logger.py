@@ -24,11 +24,11 @@ class ResultLogger():
             # TODO automatically create dirs and files as necessary
             if isinstance(result, list):
                 for item in result:
-                    self.write_git_entry(item, temp_dir, repo)
+                    self._write_git_entry(item, temp_dir, repo)
             else:
-                self.write_git_entry(result, temp_dir, repo)
-        repo.index.commit("Updated entry.")
-        repo.remotes.origin.push()
+                self._write_git_entry(result, temp_dir, repo)
+            repo.index.commit("Updated entry.")
+            repo.remotes.origin.push()
 
     def _write_stream(self, result):
         json.dump(result, self.stream, sort_keys=True, indent=2, cls=ExtendedJSONEncoder)
