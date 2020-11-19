@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 
-# Currently for deploying when you also want to create a new
-# environment, not for redeploying to an existing environment.
-
 import sys
-if sys.version_info.major < 3 or sys.version_info.minor < 7:
-    print("Error: This script requires at least Python 3.7.", file=sys.stderr)
+if sys.version_info.major < 3 or sys.version_info.minor < 8:
+    print("Error: This script requires at least Python 3.8.", file=sys.stderr)
     exit(1)
 
+import argcomplete
 import argparse
 import boto3
+import json
 import pprint
 import re
 import safecast_deploy
@@ -21,6 +20,10 @@ import safecast_deploy.ssh
 import safecast_deploy.state
 import time
 
+from safecast_deploy.aws_state import AwsTierType, EnvType
+from safecast_deploy.extended_json_encoder import ExtendedJSONEncoder
+from safecast_deploy.result_logger import ResultLogger
+
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -30,9 +33,10 @@ def parse_args():
     list_arns_p.set_defaults(func=run_list_arns)
 
     apps = ['api', 'ingest', 'reporting']
-    environments = ['dev', 'prd']
+    environments = [type.value for type in list(EnvType)]
+    tiers = [type.value for type in list(AwsTierType)]
 
-    desc_metadata_p = ps.add_parser('desc_metadata', help="")
+    desc_metadata_p = ps.add_parser('desc_metadata', help="Describe the metadata available for this application.")
     desc_metadata_p.add_argument('app',
                                  choices=apps,
                                  help="The application to describe.",)
@@ -50,7 +54,7 @@ def parse_args():
                            choices=apps,
                            help="The target application to deploy to.",)
     new_env_p.add_argument('env',
-                           choices=['dev', 'prd'],
+                           choices=environments,
                            help="The target environment to deploy to.",)
     new_env_p.add_argument('version', help="The new version to deploy.")
     new_env_p.add_argument('arn', help="The ARN the new deployment should use.")
@@ -78,9 +82,9 @@ def parse_args():
     save_configs_p.add_argument('-e', '--env',
                                 choices=environments,
                                 help="Limit the overwrite to a specific environment.")
-    save_configs_p.add_argument('-r', '--role',
-                                choices=['web', 'wrk'],
-                                help="Limit the overwrite to a specific role.")
+    save_configs_p.add_argument('-t', '--tier',
+                                choices=tiers,
+                                help="Limit the overwrite to a specific tier.")
     save_configs_p.set_defaults(func=safecast_deploy.config_saver.run_cli)
 
     ssh_p = ps.add_parser('ssh', help='SSH to the selected environment.')
@@ -88,10 +92,10 @@ def parse_args():
                        choices=apps,
                        help="The target application.",)
     ssh_p.add_argument('env',
-                       choices=['dev', 'prd', ],
+                       choices=environments,
                        help="The target environment.",)
-    ssh_p.add_argument('role',
-                       choices=['web', 'wrk', ],
+    ssh_p.add_argument('tier',
+                       choices=tiers,
                        help="The type of server.",)
     ssh_p.add_argument('-s', '--select', action='store_true',
                        help="Choose a specific server. Otherwise, will connect to the first server found.",)
@@ -110,12 +114,12 @@ def parse_args():
                             help="The target application.",)
     versions_p.set_defaults(func=run_versions)
 
+    argcomplete.autocomplete(p)
     args = p.parse_args()
     if 'func' in args:
         args.func(args)
     else:
         p.error("too few arguments")
-
 
 
 def run_list_arns(args):
@@ -139,8 +143,9 @@ def run_list_arns(args):
 
 
 def run_desc_metadata(args):
-    state = safecast_deploy.state.State(args.app)
-    pprint.PrettyPrinter(stream=sys.stderr).pprint(state.env_metadata)
+    state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
+    json.dump(state.old_aws_state.to_dict(), sys.stdout, sort_keys=True, indent=2)
+    print()
 
 
 def run_desc_template(args):
@@ -149,43 +154,51 @@ def run_desc_template(args):
         ApplicationName=args.app,
         TemplateName=args.template,
     )
-    pprint.PrettyPrinter(stream=sys.stderr).pprint(template)
+    json.dump(template, sys.stdout, sort_keys=True, indent=2, cls=ExtendedJSONEncoder)
+    print()
 
 
 def run_new_env(args):
-    state = safecast_deploy.state.State(
-        args.app,
-        args.env,
-        new_version=args.version,
-        new_arn=args.arn
-    )
-    safecast_deploy.new_env.NewEnv(state, not args.no_update_templates).run()
+    eb_client = boto3.client('elasticbeanstalk')
+    result_logger = ResultLogger()
+    state = safecast_deploy.state.State(args.app, eb_client)
+    config_saver = safecast_deploy.config_saver.ConfigSaver(eb_client, result_logger)
+    safecast_deploy.new_env.NewEnv(
+        EnvType(args.env),
+        state.old_aws_state,
+        state.new_aws_state(new_version=args.version),
+        boto3.client('elasticbeanstalk'),
+        result_logger,
+        config_saver,
+        (not args.no_update_templates),
+    ).run()
 
 
 def run_same_env(args):
-    state = safecast_deploy.state.State(
-        args.app,
-        args.env,
-        new_version=args.version,
-    )
-    safecast_deploy.same_env.SameEnv(state).run()
+    state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
+    env_type = EnvType(args.env)
+    safecast_deploy.same_env.SameEnv(
+        env_type,
+        state.old_aws_state,
+        state.new_aws_state(env_type, new_version=args.version),
+        boto3.client('elasticbeanstalk'),
+        ResultLogger(),
+    ).run()
 
 
 def run_ssh(args):
-    state = safecast_deploy.state.State(args.app, args.env)
-    safecast_deploy.ssh.Ssh(state, args).run()
+    aws_state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk')).old_aws_state
+    safecast_deploy.ssh.ssh(aws_state, EnvType(args.env), AwsTierType(args.tier), args.select)
 
 
 def run_versions(args):
-    state = safecast_deploy.state.State(args.app)
+    state = safecast_deploy.state.State(args.app, boto3.client('elasticbeanstalk'))
     print(*state.available_versions, sep='\n')
 
 
 def main():
     parse_args()
     # TODO method to switch to maintenance page
-    #
-    # TODO method to clean out old versions
 
 
 if __name__ == '__main__':

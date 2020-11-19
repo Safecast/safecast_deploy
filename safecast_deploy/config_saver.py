@@ -1,65 +1,66 @@
+import boto3
 import datetime
 import pprint
 import sys
 
-from safecast_deploy import git_logger, state, verbose_sleep
+from safecast_deploy import verbose_sleep
+from safecast_deploy.aws_state import AwsTierType, EnvType
+from safecast_deploy.result_logger import ResultLogger
+from safecast_deploy.state import State
 
 
 def run_cli(args):
-    ConfigSaver(app=args.app, env=args.env, role=args.role).run()
+    app = args.app
+    env = EnvType(args.env) if args.env else None
+    tier = AwsTierType(args.tier) if args.tier else None
+    ConfigSaver(boto3.client('elasticbeanstalk'), ResultLogger()).run(app=app, env=env, tier=tier)
 
 
 class ConfigSaver:
-    def __init__(self, app=None, env=None, role=None):
-        self.app = app
-        self.env = env
-        self.role = role
-        self.states = {}
+    # This class is not thread-safe.
+    def __init__(self, eb_client, result_logger):
+        self._c = eb_client
+        self._result_logger = result_logger
+        self._completed_list = []
+
+    def run(self, app=None, env=None, tier=None):
+        all_apps = ['api', 'ingest', 'recording']
+        states = {}
         if app is None:
-            self.states['api'] = state.State('api')
-            self.states['ingest'] = state.State('ingest')
-            self.states['reporting'] = state.State('reporting')
-            self._c = self.states['api'].eb_client
+            for default_app in all_apps:
+                states[default_app] = State(default_app, self._c).old_aws_state
         else:
-            self.states[app] = state.State(app)
-            self._c = self.states[app].eb_client
-        self.completed_list = []
+            states[app] = State(app, self._c).old_aws_state
 
-    def run(self):
-        for app in self.states:
-            env_metadata = self.states[app].env_metadata
-            if self.app is None:
-                self.process_app('api')
-                self.process_app('ingest')
-            else:
-                self.process_app(app)
-        git_logger.log_result(self.completed_list)
-        pprint.PrettyPrinter(stream=sys.stderr).pprint(self.completed_list)
+        for state in states:
+            self.process_state(states[state], env, tier)
+        self._result_logger.log_result(self._completed_list)
+        self._completed_list = []
 
-    def process_app(self, app):
-        if self.env is None:
-            self.process_env(app, 'dev')
-            self.process_env(app, 'prd')
+    def process_state(self, state, env, tier):
+        if env is None:
+            for available_env in state.envs:
+                self.process_env(state, available_env, tier)
         else:
-            self.process_env(app, self.env)
+            self.process_env(state, env, tier)
 
-    def process_env(self, app, env):
+    def process_env(self, state, env, tier):
         template_names = {
-            'web': env,
-            'wrk': '{}-wrk'.format(env),
+            AwsTierType.WEB: env.value,
+            AwsTierType.WORKER: f'{env.value}-wrk',
         }
-        if self.role is None:
-            self.process_role(app, env, 'web', template_names)
-            if self.states[app].has_worker:
-                self.process_role(app, env, 'wrk', template_names)
+        if tier is None:
+            for available_tier in state.envs[env]:
+                self.process_tier(state, env, available_tier, template_names)
         else:
-            self.process_role(app, env, self.role, template_names)
+            self.process_tier(state, env, tier, template_names)
 
-    def process_role(self, app, env, role, template_names):
+    def process_tier(self, state, env, tier, template_names):
         start_time = datetime.datetime.now(datetime.timezone.utc)
-        template_name = template_names[role]
-        env_id = self.states[app].env_metadata[template_name]['api_env']['EnvironmentId']
-        env_name = self.states[app].env_metadata[template_name]['name']
+        template_name = template_names[tier]
+        app = state.aws_app_name
+        env_id = state.envs[env][tier].environment_id
+        env_name = state.envs[env][tier].name
         print(f"Starting update of template {template_name} from {env_name}", file=sys.stderr)
         self._c.delete_configuration_template(
             ApplicationName=app,
@@ -73,14 +74,15 @@ class ConfigSaver:
         )
         print(f"Completed update of template {template_name} from {env_name}", file=sys.stderr)
         completed_time = datetime.datetime.now(datetime.timezone.utc)
-        self.completed_list.append({
+        self._completed_list.append({
             'app': app,
             'completed_at': completed_time,
             'elapsed_time': (completed_time - start_time).total_seconds(),
             'env': env,
             'event': 'save_configs',
-            'role': role,
+            'tier': tier,
+            'source_env_id': env_id,
             'source_env_name': env_name,
             'started_at': start_time,
-            'template_name': template_name
+            'template_name': template_name,
         })
