@@ -1,0 +1,20 @@
+name: "Safecast Deploy"
+description: "Handles deployment operations for safecast environments"
+inputs:
+  mode:
+    description: "Deploy mode (same_env,new_env)"
+    required: true
+    default: same_env
+  app:
+    description: 'Application: {api,ingest,reporting}'
+    required: true
+  env:
+    description: 'Env: {dev,prd}'
+    required: true
+  version:
+    description: 'App version'
+    required: true
+
+runs:
+  using: 'docker'
+  image: 'docker://safecast/github-actions-safecast-deploy:v1'
