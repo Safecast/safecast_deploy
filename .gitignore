@@ -130,3 +130,5 @@ dmypy.json
 
 .direnv
 .envrc
+
+/aws-cli.env

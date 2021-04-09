@@ -1,0 +1,14 @@
+version: "3"
+services:
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      # generate this file with aws-vault
+      #
+      #   $ aws-vault exec safecast --no-session -- env | grep --color=no '^AWS_' > aws-cli.env
+      #
+      - aws-cli.env
+    volumes:
+      - .:/src
