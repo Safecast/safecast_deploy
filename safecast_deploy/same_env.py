@@ -92,7 +92,7 @@ class SameEnv:
     def _wait_for_green(self, env_name):
         verbose_sleep(70)
         wait_seconds = 0
-        while wait_seconds < 480:
+        while wait_seconds < 1200:
             health = self._c.describe_environment_health(
                 EnvironmentName=env_name,
                 AttributeNames=['HealthStatus', ]
@@ -102,6 +102,6 @@ class SameEnv:
                 return
             verbose_sleep(40)
             wait_seconds += 40
-        print("Environment health did not return to normal within 480 seconds. Aborting further operations.",
+        print("Environment health did not return to normal within 1200 seconds. Aborting further operations.",
               file=sys.stderr)
         exit(1)
